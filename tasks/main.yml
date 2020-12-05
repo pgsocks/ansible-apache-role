@@ -1,0 +1,46 @@
+---
+- name: Install Apache HTTPD
+  win_chocolatey:
+    name: apache-httpd
+    params: /InstallLocation:C:\httpd /port:80
+- name: Install PHP
+  win_chocolatey:
+    name: php
+    params: /ThreadSafe /InstallDir:C:\php
+- name: Download SQL Server PHP Drivers
+  win_get_url:
+    url: https://go.microsoft.com/fwlink/?linkid=2120362
+    dest: C:\sqlsrv58.exe
+- name: Extract SQL Server PHP Drivers
+  win_shell: C:\sqlsrv58.exe /Q /T:C:\php\ext
+  args:
+    creates: C:\php\ext\php_sqlsrv_74_ts_x64.dll
+- name: Edit PHP.ini
+  win_lineinfile:
+    path: C:\php\php.ini
+    line: '{{ item }}'
+  with_items:
+    - extension=sqlsrv_74_ts_x64
+    - extension=pdo_sqlsrv_74_ts_x64
+- name: Copy Apache PHP Config
+  win_copy:
+    src: httpd-php.conf
+    dest: C:\httpd\Apache24\conf\extra\httpd-php.conf
+- name: Include PHP in httpd.conf
+  win_lineinfile:
+    path: C:\httpd\Apache24\conf\httpd.conf
+    line: Include conf/extra/httpd-php.conf
+- name: Restart Service
+  win_service:
+    name: Apache
+    state: restarted
+- name: Copy Test Page
+  win_copy:
+    src: info.php
+    dest: C:\httpd\Apache24\htdocs\info.php
+- name: Test PHP
+  win_uri:
+    url: http://localhost/info.php
+  register: http_response
+  failed_when: http_response.status_code != 200
+
